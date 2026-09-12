@@ -54,27 +54,37 @@ chmod +x /home/user/bin/backup_tools"""
     # Step 4: Decode the JPEG (base64 encoded)
     jpeg_data = base64.b64decode(secret_b64)
 
-    # Step 5: Extract revb64 flag from JPEG comment
-    # JPEG comment marker is at offset 20, contains JSON with encoding "revb64"
+    # Step 5: Extract JPEG comment (contains labeled decoy) and retrieve real flag
+    # The JPEG comment contains a marker explicitly labeled "DECOY FLAG" with a
+    # reversed-base64 fake flag. The real flag is retrieved from the Pastebin URL
+    # rendered inside the decoded JPEG image (https://pastebin.com/raw/3KgAGxgt).
     import json
-    comment_start = jpeg_data.find(b'{"marker"')
-    depth = 0
-    for i in range(comment_start, comment_start + 500):
-        if jpeg_data[i] == ord('{'):
-            depth += 1
-        elif jpeg_data[i] == ord('}'):
-            depth -= 1
-            if depth == 0:
-                meta = json.loads(jpeg_data[comment_start:i+1])
-                inner = json.loads(meta["metadata"])
-                revb64 = inner["value"]
-                flag = base64.b64decode(revb64[::-1]).decode('utf-8')
-                print(f"\n[+] Flag: {flag}\n")
-                client.close()
-                return flag
+    import urllib.request
+    with open("secret_decoded.jpg", "wb") as f:
+        f.write(jpeg_data)
 
-    print("[-] Could not extract flag")
+    comment_start = jpeg_data.find(b'{"marker"')
+    if comment_start != -1:
+        depth = 0
+        for i in range(comment_start, min(comment_start + 500, len(jpeg_data))):
+            if jpeg_data[i] == ord('{'):
+                depth += 1
+            elif jpeg_data[i] == ord('}'):
+                depth -= 1
+                if depth == 0:
+                    meta = json.loads(jpeg_data[comment_start:i+1])
+                    inner = json.loads(meta["metadata"])
+                    revb64 = inner["value"]
+                    decoy = base64.b64decode(revb64[::-1]).decode('utf-8', 'replace')
+                    print(f"[*] embedded comment value: {decoy} (decoy - the image points to a pastebin)")
+                    break
+
+    print("[*] decode secret.jpg; it renders https://pastebin.com/raw/3KgAGxgt")
+    req = urllib.request.Request("https://pastebin.com/raw/3KgAGxgt", headers={"User-Agent": "Mozilla/5.0"})
+    flag = urllib.request.urlopen(req, timeout=30).read().decode().strip()
+    print(f"\n[+] Flag: {flag}\n")
     client.close()
+    return flag
 
 if __name__ == "__main__":
     solve()
