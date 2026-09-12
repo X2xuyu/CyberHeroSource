@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*_key
+id_rsa*
+*.pem
+*.zip
+*.jpg
+*.png
